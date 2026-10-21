@@ -3,10 +3,13 @@ require("dotenv/config");
 const prisma = require("./db");
 
 async function main() {
+  // Clear existing data first
   await prisma.post.deleteMany();
+  await prisma.profile.deleteMany();
   await prisma.user.deleteMany();
 
-  const users = await prisma.user.createMany({
+  // Create users
+  await prisma.user.createMany({
     data: [
       {
         username: "alice",
@@ -46,72 +49,108 @@ async function main() {
     ]
   });
 
+  // Get user IDs to associate posts and profiles
+  const users = await prisma.user.findMany();
 
-  const posts = await prisma.post.createMany({
+  const userIds = Object.fromEntries(
+    users.map((user) => [user.username, user.id])
+  );
+
+  // Create posts linked to existing users
+  await prisma.post.createMany({
     data: [
       {
         imageUrl: "https://example.com/img1.jpg",
         caption: "Exploring Delhi streets",
-        location: "Delhi"
+        location: "Delhi",
+        userId: userIds.alice
       },
       {
         imageUrl: "https://example.com/img2.jpg",
         caption: "Beautiful beach day",
-        location: "Goa"
+        location: "Goa",
+        userId: userIds.bob
       },
       {
         imageUrl: "https://example.com/img3.jpg",
         caption: "Food and travel memories",
-        location: "Delhi"
+        location: "Delhi",
+        userId: userIds.alice
       },
       {
         imageUrl: "https://example.com/img4.jpg",
         caption: "Mountain adventure",
-        location: "Manali"
+        location: "Manali",
+        userId: userIds.charlie
       },
       {
         imageUrl: "https://example.com/img5.jpg",
         caption: "Coding from cafe",
-        location: "Bangalore"
+        location: "Bangalore",
+        userId: userIds.david
       },
       {
         imageUrl: "https://example.com/img6.jpg",
         caption: "Amazing sunset view",
-        location: "Goa"
+        location: "Goa",
+        userId: userIds.emma
       },
       {
         imageUrl: "https://example.com/img7.jpg",
         caption: "Street photography",
-        location: "Mumbai"
+        location: "Mumbai",
+        userId: userIds.charlie
       },
       {
         imageUrl: "https://example.com/img8.jpg",
         caption: "Weekend trip",
-        location: "Delhi"
+        location: "Delhi",
+        userId: userIds.alice
       },
       {
         imageUrl: "https://example.com/img9.jpg",
         caption: "Nature photography",
-        location: "Manali"
+        location: "Manali",
+        userId: userIds.charlie
       },
       {
         imageUrl: "https://example.com/img10.jpg",
         caption: "Learning Prisma ORM",
-        location: "Bangalore"
+        location: "Bangalore",
+        userId: userIds.david
       },
       {
         imageUrl: "https://example.com/img11.jpg",
         caption: "Travel diary",
-        location: "Goa"
+        location: "Goa",
+        userId: userIds.emma
       },
       {
         imageUrl: "https://example.com/img12.jpg",
         caption: "Backend development",
-        location: "Hyderabad"
+        location: "Hyderabad",
+        userId: userIds.bob
       }
     ]
   });
 
+  // Create profiles linked to existing users
+  await prisma.profile.createMany({
+    data: [
+      {
+        bio: "Full-stack developer profile",
+        userId: userIds.alice
+      },
+      {
+        bio: "Designer profile",
+        userId: userIds.bob
+      },
+      {
+        bio: "Photography portfolio",
+        userId: userIds.charlie
+      }
+    ]
+  });
 
   console.log("Database seeded successfully");
 }
@@ -124,3 +163,4 @@ main()
   .finally(async () => {
     await prisma.$disconnect();
   });
+

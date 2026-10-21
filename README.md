@@ -1,331 +1,251 @@
-## Part 2 — Post CRUD API + Prisma Query Operations
 
-In this task, you will extend the existing Prisma + Express application by implementing **Post CRUD APIs** and practicing Prisma query operations.
+# Lab: Prisma Relations
 
-The User CRUD API is already completed. You only need to implement the logic inside:
+## Objective
 
-```
-src/routes/posts.routes.js
-```
+In this lab, you will learn how to work with relationships in Prisma:
 
-Request flow:
+1. One-to-Many: User and Post
+2. Connecting a post to an existing user
+3. Cascade Delete
+4. One-to-One: User and Profile
+5. Many-to-Many: Student and Course
 
-```
-Request → Express Route → Prisma Client → PostgreSQL
+---
+
+## Step 1: Get the Latest Project
+
+Before starting, pull the latest changes from the `main` branch. The updated repository contains the new seed file.
+
+Run:
+
+```bash
+git checkout main
+git pull origin main
 ```
 
 ---
 
-## 1. Database Setup
+## Step 2: Update `schema.prisma`
 
-Update your `.env` file with the PostgreSQL database URL.
+**File:** `prisma/schema.prisma`
 
-Example:
+Before running the migration commands, make the following changes to your existing schema.
 
-```env
-DATABASE_URL="postgresql://<username>@localhost:5432/<database>"
-```
+### A. Update the User Model
 
-Run the following commands:
+Keep all existing fields and add:
 
-```bash
-npm install
-```
+- A `posts` relation so one user can have multiple posts.
+- A `profile` relation so a user can have at most one profile.
+
+### B. Update the Post Model
+
+Keep all existing fields and add:
+
+- A required `userId` field to store the associated user's ID.
+- A `user` relation connecting each post to one user.
+- The `onDelete: Cascade` option so deleting a user also deletes their posts.
+
+### C. Add the Profile Model
+
+Create a new model named `Profile` with:
+
+- An auto-incrementing ID.
+- A required `bio` field.
+- A required `userId` field.
+- A unique constraint on `userId`.
+- A relation connecting the profile to a user.
+- The `onDelete: Cascade` option.
+
+**Important:** Complete all these schema changes now. You should not need to modify the schema again for Questions 1–4.
+
+---
+
+## Step 3: Reset and Migrate the Database
+
+The new schema requires fresh data because posts must now belong to users. Follow these steps in order.
+Also, make sure your DATABASE_URL is updated correctly. 
+
+### A. Reset the Existing Database
 
 ```bash
 npx prisma migrate reset
 ```
 
+**Warning:** This permanently deletes the existing data in the database being reset. Use only your development database.
+
+### B. Create and Apply the New Migration
+
 ```bash
-npx prisma migrate dev --name init
+npx prisma migrate dev --name add_relations
 ```
+
+This creates and applies a migration for your schema changes.
+
+### C. Generate Prisma Client
 
 ```bash
 npx prisma generate
 ```
 
-Run the seed file:
+### D. Seed the Database
 
 ```bash
 npx prisma db seed
 ```
 
-The seed file will insert sample users and posts into the database.
+This creates fresh users, posts connected to users, and profiles for selected users.
+
+You do not need to manually assign posts to users.
 
 ---
 
-# 2. Implement Post Routes
+## Step 4: Start the Application
 
-File:
+Start your Express application using the command already configured in your project's `package.json`.
 
+For example, if the project has a development script, use:
+
+```bash
+npm run dev
 ```
-src/routes/posts.routes.js
-```
 
-The routes are already created. Implement only the Prisma logic.
+If your project uses a different start command, use that command instead.
 
 ---
 
-## Post CRUD Operations
+## Question 1: One-to-Many — User and Post
 
-### 1. Create Post
+**Task:** Understand and verify the relationship between users and posts. (No coding required)
 
-Endpoint:
+### Requirements
 
-```
-POST /posts
-```
+- One user can have multiple posts.
+- Each post belongs to one user.
+- Each post stores the associated user's ID.
 
-Create a new post.
+### How to Check
 
-Request:
+Use your API testing tool to call:
 
-```json
-{
-  "imageUrl": "image.png",
-  "caption": "My trip",
-  "location": "Goa"
-}
+```http
+GET /users
 ```
 
-Requirements:
-
-- `imageUrl` is required.
-- `caption` and `location` are optional.
-- Return the created post.
-
----
-
-### 2. Get All Posts
-
-Endpoint:
-
-```
+```http
 GET /posts
 ```
 
-Return all posts from the database.
+Identify a user who has multiple posts and note the relationship.
+
+No additional schema changes are required.
 
 ---
 
-### 3. Get Post By ID
+## Question 2: Connect a Post to an Existing User
 
-Endpoint:
+**Task:** Update the existing endpoint to connect a new post to a user.
 
-```
-GET /posts/:id
-```
+**File:** `src/routes/posts.route.js`
 
-Example:
+**Endpoint:** `POST /posts`
 
-```
-GET /posts/5
-```
+### Requirements
 
-Return the post if it exists.
+- Accept `imageUrl`, `caption`, `location`, and `userId` in the request body.
+- Connect the post to an existing user using Prisma's `connect` operation.
+- Return the created post with its associated user.
+- Update `GET /posts` so each post includes its associated user.
 
-If post does not exist:
+### How to Check
 
-```json
-{
-  "error": "Post not found"
-}
-```
+1. Call `GET /users` and select a valid user ID.
+2. Send a POST request to `/posts` with the required fields and that user's ID.
+3. Check that the response includes the created post and its associated user.
+4. Call `GET /posts` and verify that the new post appears with its user information.
 
 ---
 
-### 4. Update Post
+## Question 3: Cascade Delete
 
-Endpoint:
+**Task:** Verify that deleting a user also deletes their associated posts.
 
-```
-PATCH /posts/:id
-```
+**File:** `src/routes/user.route.js`
 
-Allowed fields:
+**Endpoint:** `DELETE /users/:id`
 
-```
-imageUrl
-caption
-location
-```
+### Requirements
 
-Example:
+- Use the existing delete endpoint.
+- Do not add separate post-deletion logic.
+- Verify the behavior of `onDelete: Cascade`.
 
-```json
-{
-  "caption": "Updated caption"
-}
-```
+### How to Check
 
-Return the updated post.
+1. Use `GET /posts` to identify posts belonging to a particular user.
+2. Delete that user using `DELETE /users/:id`.
+3. Call `GET /posts` again.
+4. Verify that the deleted user's posts are gone and other users' posts remain.
+
+Use test data carefully because deletion cannot be undone easily.
 
 ---
 
-### 5. Delete Post
+## Question 4: One-to-One — User and Profile
 
-Endpoint:
+**Task:** Create and retrieve profiles associated with users.
 
+A new file is already created:
+
+```text
+src/routes/profile.route.js
 ```
-DELETE /posts/:id
-```
 
-Delete the post using its id.
+### Implement These Endpoints
 
-Successful response:
+- `POST /profiles`: Create a profile and connect it to an existing user.
+- `GET /profiles`: Retrieve profiles along with their associated users.
 
-```
-204 No Content
-```
+Register the new profile router in your main Express application file, alongside the existing User and Post routers.
+
+### How to Check
+
+1. Use `GET /users` to identify a user who does not already have a profile.
+2. Send a POST request to `/profiles` with the profile's bio and the selected user's ID.
+3. Call `GET /profiles`.
+4. Verify that the profile and its associated user are returned.
+5. Try creating another profile for the same user and observe the unique constraint.
+
+**Note:** In the provided seed data, David and Emma do not have profiles initially.
 
 ---
 
-# Advanced Prisma Queries
+## Question 5: Many-to-Many — Student and Course
 
-## 1. Search Posts
+**Task:** Understand how students and courses can have a many-to-many relationship.
 
-Endpoint:
+### Requirements
 
-```
-GET /posts/search?value=travel
-```
+- A student can enroll in multiple courses.
+- A course can have multiple students.
+- Understand how Prisma represents this relationship.
+- Understand how to connect an existing student to an existing course.
+- Understand how to retrieve a student along with their courses.
 
-Search posts using:
-
-- caption
-- location
-
-Requirements:
-
-- Use `contains`
-- Use case-insensitive search
-- Combine conditions using `OR`
+**Important:** This is a separate schema example. Do not modify the main project's schema for this question.
 
 ---
 
-## 2. Filter Posts By ID Range
+## Final Submission Checklist
 
-Endpoint:
-
-```
-GET /posts/filter/range?min=5&max=20
-```
-
-Return posts where:
-
-```
-id >= min
-id <= max
-```
-
-Use:
-
-```
-gte
-lte
-```
-
----
-
-## 3. Filter Posts By Date
-
-Endpoint:
-
-```
-GET /posts/filter/date?after=2026-01-01
-```
-
-Return posts created after the given date.
-
-Use:
-
-```
-gt
-```
-
----
-
-## 4. Sort Posts
-
-Endpoint:
-
-```
-GET /posts/sort?field=id&order=desc
-```
-
-Support sorting by:
-
-```
-id
-createdAt
-```
-
-Use:
-
-```
-orderBy
-```
-
----
-
-## 5. Pagination
-
-Endpoint:
-
-```
-GET /posts/pagination?page=2&limit=5
-```
-
-Implement pagination using:
-
-```
-skip
-take
-```
-
-Formula:
-
-```
-skip = (page - 1) * limit
-```
-
----
-
-## Learning Outcomes
-
-After completing this task, you should understand:
-
-- Prisma CRUD operations
-- `create`
-- `findMany`
-- `findUnique`
-- `update`
-- `delete`
-- Filtering using `where`
-- Searching using `contains`
-- Combining conditions using `OR`
-- Comparison operators:
-  - `gt`
-  - `gte`
-  - `lt`
-  - `lte`
-- Sorting using `orderBy`
-- Pagination using `skip` and `take`
-
----
-
-## Final Checklist
-
-- Database migration completed
-- Prisma Client generated
-- Seed data inserted
-- POST `/posts` works
-- GET `/posts` works
-- GET `/posts/:id` works
-- PATCH `/posts/:id` works
-- DELETE `/posts/:id` works
-- Search implemented using `contains`
-- Range filter implemented using `gte/lte`
-- Date filter implemented using `gt`
-- Sorting implemented using `orderBy`
-- Pagination implemented using `skip/take`
+- [ ] Pulled the latest project changes from `main`.
+- [ ] Updated `schema.prisma` before running migrations.
+- [ ] Reset the development database and applied the new migration.
+- [ ] Generated Prisma Client and ran the updated seed file.
+- [ ] Verified the User–Post one-to-many relationship.
+- [ ] Updated `POST /posts` to connect a post to an existing user.
+- [ ] Updated `GET /posts` to return associated user information.
+- [ ] Verified cascade delete.
+- [ ] Implemented and tested `POST /profiles` and `GET /profiles`.
+- [ ] Understood the separate Student–Course many-to-many example.
